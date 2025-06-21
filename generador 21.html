@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Generador de Oficios Word</title>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.2.2/build/index.umd.js"></script>
+  <style>
+    #cuerpo {
+      width: 100%;
+      min-height: 150px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-bottom: 20px;
+      white-space: pre-wrap;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>📝 Generador de Oficios</h1>
+  <form id="formulario">
+    <label for="formato">Seleccionar formato:</label><br>
+    <select id="formato">
+      <option value="formato1">Anexo contrato</option>
+      <option value="formato2">Prórroga boleta</option>
+    </select><br><br>
+
+    <label>Materia:</label><br>
+    <input type="text" id="materia" required><br><br>
+
+    <label>Fecha:</label><br>
+    <input type="date" id="fecha" required><br><br>
+
+    <label>Destinatario (nombre y cargo):</label><br>
+    <input type="text" id="destinatario" required><br><br>
+
+    <label>Cuerpo del oficio:</label><br>
+    <div id="cuerpo" contenteditable="true"></div><br>
+
+    <button type="button" onclick="generarDocumento()">Generar Documento</button>
+  </form>
+
+  <script>
+    let numeroOficio = 1;
+
+    const cuerpos = {
+      formato1: `Junto con saludar, hago ingreso del “Anexo de contrato de construcción” correspondientes a los comités: “Comité CSR Mariquina y Construcción San José 1”, ambos correspondientes al PHR del DS N°10, de la comuna de Mariquina.`,
+      formato2: `Junto con saludar, me dirijo a usted para solicitar la prórroga de vigencia de la boleta de garantía correspondiente al subsidio habitacional, debido a que el proceso constructivo se encuentra en ejecución y requiere más tiempo para su finalización.`
+    };
+
+    document.getElementById("formato").addEventListener("change", function () {
+      const formato = this.value;
+      document.getElementById("cuerpo").innerHTML = cuerpos[formato] || "";
+    });
+
+    async function generarDocumento() {
+      const { Document, Packer, Paragraph, TextRun, AlignmentType, ImageRun } = window.docx;
+
+      const materia = document.getElementById('materia').value;
+      const fechaInput = document.getElementById('fecha').value;
+      const destinatario = document.getElementById('destinatario').value;
+      const cuerpoHTML = document.getElementById('cuerpo').innerHTML;
+
+      if (!materia || !fechaInput || !destinatario || !cuerpoHTML) {
+        alert('Por favor, complete todos los campos.');
+        return;
+      }
+
+      const fecha = new Date(fechaInput);
+      const fechaFormateada = fecha.toLocaleDateString('es-CL', {
+        year: 'numeric', month: 'long', day: 'numeric'
+      });
+
+      // Logo en base64: imagen de prueba 1x1 px
+      const imageBase64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQYV2NkYGBgAAAABQABe4GNWQAAAABJRU5ErkJggg==";
+      const imageArrayBuffer = Uint8Array.from(
+        atob(imageBase64.split(",")[1]),
+        c => c.charCodeAt(0)
+      );
+
+      // Convertir HTML a texto plano conservando saltos de línea
+      const textoPlano = cuerpoHTML
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<[^>]*>/g, '')
+        .trim();
+
+      const parrafos = textoPlano.split('\n').map(linea =>
+        new Paragraph({
+          text: linea,
+          alignment: AlignmentType.JUSTIFIED,
+        })
+      );
+
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: [
+              // Logo
+              new Paragraph({
+                children: [
+                  new ImageRun({ data: imageArrayBuffer, transformation: { width: 100, height: 50 } })
+                ]
+              }),
+              // Encabezado
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun(`OFICIO Folio N° ${numeroOficio}/`),
+                  new TextRun({ text: `\nMAT.: ${materia}`, break: 1 }),
+                  new TextRun({ text: `\nVALDIVIA, ${fechaFormateada}`, break: 1 })
+                ]
+              }),
+              new Paragraph({ text: '', spacing: { after: 300 } }),
+              new Paragraph({ children: [ new TextRun({ text: 'DE\t: JUAN GARCIA GOMEZ – ASISTENTE SOCIAL', bold: true }) ] }),
+              new Paragraph({ children: [ new TextRun({ text: 'ENTIDAD PATROCINANTE CONSTRUYENDO CHILE LTDA.', bold: true }) ] }),
+              new Paragraph({ children: [ new TextRun({ text: 'A\t:  NEBENKA DONOSO SAN MARTIN', bold: true }) ] }),
+              new Paragraph({ children: [ new TextRun({ text: 'DIRECTOR SERVIU - REGION DE LOS RIOS', bold: true }) ] }),
+              new Paragraph({ children: [ new TextRun({ text: `At.\t: ${destinatario}`, bold: true }) ] }),
+              new Paragraph({ text: '', spacing: { after: 300 } }),
+              // Cuerpo justificado
+              ...parrafos,
+              new Paragraph({ text: '', spacing: { after: 400 } }),
+              // Firma centrad
+              new Paragraph({ alignment: AlignmentType.CENTER, children: [
+                new TextRun({ text: 'JUAN ANTONIO GARCÍA GÓMEZ', break: 1 }),
+                new TextRun({ text: 'Representante Legal  EGIS CONSTRUYENDO CHILE LTDA.', break: 1 }),
+                new TextRun({ text: 'Fono: 063-2209785 / 74650942', break: 1 }),
+                new TextRun('jgconstruyendochile@gmail.com')
+              ] }),
+              new Paragraph({ text: '', spacing: { after: 300 } }),
+              // Pie de firma
+              new Paragraph({ children: [ new TextRun('JGG/dpl') ] }),
+              new Paragraph({ children: [ new TextRun('DISTRIBUCIÓN') ] }),
+              new Paragraph({ children: [ new TextRun('- Destinatario') ] }),
+              new Paragraph({ children: [ new TextRun('- Archivo Egis Construyendo Chile LTDA.') ] })
+            ]
+          }
+        ],
+        page: { size: { width: 12440, height: 15840 } }
+      });
+
+      const blob = await Packer.toBlob(doc);
+      const nombreArchivo = `Oficio_Folio_${numeroOficio}.docx`;
+      numeroOficio++;
+
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = nombreArchivo;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
